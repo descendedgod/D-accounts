@@ -5,11 +5,13 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.TableRow;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import java.sql.*;
 import java.util.*;
 import java.io.FileInputStream;
+import java.util.Properties;
 import java.time.*;
 
 public class TimetableManager {
@@ -41,6 +43,20 @@ public class TimetableManager {
         table.getColumns().addAll(dateCol, subjectCol, courseCol, startCol, stopCol, completedCol);
         table.setItems(getTimetable(username));
         table.setPrefHeight(250);
+
+        table.setRowFactory(tv -> {
+            TableRow<TimetableRecord> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty() && event.getClickCount() == 2) {
+                    TimetableRecord rec = row.getItem();
+                    if (!rec.getCompleted()) {
+                        markCompleted(username, rec);
+                        table.setItems(getTimetable(username));
+                    }
+                }
+            });
+            return row;
+        });
 
         generateBtn.setOnAction(e -> {
             boolean ok = generateTimetable(username);
@@ -112,9 +128,12 @@ public class TimetableManager {
 
     // Example: Generate a 7-day timetable, languages (e.g. Espanol) every day, others distributed
     private static boolean generateTimetable(String username) {
-        try (FileInputStream fis = new FileInputStream("dbconfig.properties")) {
+        try (FileInputStream fis = new FileInputStream("dbconfig.properties");
+             FileInputStream settingsFis = new FileInputStream("settings.properties")) {
             Properties props = new Properties();
             props.load(fis);
+            Properties settings = new Properties();
+            settings.load(settingsFis);
             String url = "jdbc:mysql://" + props.getProperty("host") + ":" + props.getProperty("port") + "/" + props.getProperty("database");
             String dbUser = props.getProperty("username");
             String dbPass = props.getProperty("password");
@@ -147,15 +166,18 @@ public class TimetableManager {
             courseStmt.setInt(1, userId);
             ResultSet crs = courseStmt.executeQuery();
             while (crs.next()) courseIds.add(crs.getInt(1));
-            // Get user free time (for now, 18:00-22:00)
-            LocalTime freeStart = LocalTime.of(18,0);
-            LocalTime freeEnd = LocalTime.of(22,0);
+            // Get user free time and semester/season
+            LocalTime freeStart = LocalTime.parse(settings.getProperty("free_start", "18:00"));
+            LocalTime freeEnd = LocalTime.parse(settings.getProperty("free_end", "22:00"));
+            LocalDate semesterStart = LocalDate.parse(settings.getProperty("semester_start", LocalDate.now().toString()));
+            LocalDate semesterEnd = LocalDate.parse(settings.getProperty("semester_end", LocalDate.now().plusMonths(6).toString()));
             int studyMinutes = (int) java.time.Duration.between(freeStart, freeEnd).toMinutes();
             int slotMinutes = 60;
-            // Generate for 7 days
+            // Generate for 7 days within semester/season
             LocalDate today = LocalDate.now();
             for (int d = 0; d < 7; d++) {
                 LocalDate date = today.plusDays(d);
+                if (date.isBefore(semesterStart) || date.isAfter(semesterEnd)) continue;
                 // Always add language subject(s) every day
                 for (int sid : langSubjectIds) {
                     LocalTime st = freeStart;
@@ -191,5 +213,32 @@ public class TimetableManager {
             e.printStackTrace();
         }
         return false;
+    }
+
+    private static void markCompleted(String username, TimetableRecord rec) {
+        try (FileInputStream fis = new FileInputStream("dbconfig.properties")) {
+            Properties props = new Properties();
+            props.load(fis);
+            String url = "jdbc:mysql://" + props.getProperty("host") + ":" + props.getProperty("port") + "/" + props.getProperty("database");
+            String dbUser = props.getProperty("username");
+            String dbPass = props.getProperty("password");
+            Connection conn = DriverManager.getConnection(url, dbUser, dbPass);
+            PreparedStatement getUser = conn.prepareStatement("SELECT id FROM users WHERE username = ?");
+            getUser.setString(1, username);
+            ResultSet rs = getUser.executeQuery();
+            if (rs.next()) {
+                int userId = rs.getInt(1);
+                PreparedStatement upd = conn.prepareStatement(
+                    "UPDATE timetable SET completed = TRUE WHERE user_id = ? AND date = ? AND start_time = ? AND subject_id = (SELECT id FROM subjects WHERE subject_name = ? AND user_id = ?)");
+                upd.setInt(1, userId);
+                upd.setString(2, rec.getDate());
+                upd.setString(3, rec.getStartTime());
+                upd.setString(4, rec.getSubjectName());
+                upd.setInt(5, userId);
+                upd.executeUpdate();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

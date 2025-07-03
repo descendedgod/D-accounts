@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS timetable (
     subject_id INT NOT NULL,
     course_id INT,
     date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    stop_time TIME NOT NULL,
     completed BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id),

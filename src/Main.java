@@ -6,10 +6,17 @@ import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.scene.control.Label;
 
+import java.io.File;
+
 public class Main extends Application {
     @Override
     public void start(Stage primaryStage) {
-        // Placeholder for first-run DB config or login
+        File configFile = new File("dbconfig.properties");
+        if (!configFile.exists()) {
+            DBConfigPrompt.show(primaryStage);
+            return;
+        }
+        // Placeholder for login/dashboard
         Label label = new Label("Welcome to D-Accounts! (UI coming soon)");
         StackPane root = new StackPane(label);
         Scene scene = new Scene(root, 800, 600);

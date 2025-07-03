@@ -16,7 +16,9 @@ public class Dashboard {
         subjectBtn.setOnAction(e -> SubjectManager.show(primaryStage, username));
         Button courseBtn = new Button("Manage Courses");
         courseBtn.setOnAction(e -> CourseManager.show(primaryStage, username));
-        VBox vbox = new VBox(20, label, financeBtn, subjectBtn, courseBtn);
+        Button timetableBtn = new Button("Timetable Manager");
+        timetableBtn.setOnAction(e -> TimetableManager.show(primaryStage, username));
+        VBox vbox = new VBox(20, label, financeBtn, subjectBtn, courseBtn, timetableBtn);
         vbox.setStyle("-fx-background-color: #181c2f;");
         vbox.setPadding(new javafx.geometry.Insets(40));
         vbox.setAlignment(javafx.geometry.Pos.CENTER);

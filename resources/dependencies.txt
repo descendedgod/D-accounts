@@ -1,0 +1,8 @@
+# D-Accounts Java Project Dependencies
+
+# JavaFX (adjust version as needed)
+javafx-controls-21.0.1.jar
+javafx-fxml-21.0.1.jar
+
+# MySQL JDBC Driver
+mysql-connector-java-8.4.0.jar

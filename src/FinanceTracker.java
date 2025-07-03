@@ -1,8 +1,11 @@
 package daccounts;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import java.sql.*;
@@ -25,9 +28,21 @@ public class FinanceTracker {
         Label result = new Label();
         result.setStyle("-fx-text-fill: #fff;");
 
-        TableView<String[]> table = new TableView<>();
-        table.setPlaceholder(new Label("No records yet."));
-        table.setStyle("-fx-background-color: #232946; -fx-text-fill: #fff;");
+        // Table for finance records
+        TableView<FinanceRecord> table = new TableView<>();
+        TableColumn<FinanceRecord, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(new PropertyValueFactory<>("date"));
+        TableColumn<FinanceRecord, Double> amountCol = new TableColumn<>("Amount");
+        amountCol.setCellValueFactory(new PropertyValueFactory<>("amount"));
+        TableColumn<FinanceRecord, Double> meCol = new TableColumn<>("For Me");
+        meCol.setCellValueFactory(new PropertyValueFactory<>("forMe"));
+        TableColumn<FinanceRecord, Double> momCol = new TableColumn<>("For Mom");
+        momCol.setCellValueFactory(new PropertyValueFactory<>("forMom"));
+        TableColumn<FinanceRecord, Double> grandmaCol = new TableColumn<>("For Grandma");
+        grandmaCol.setCellValueFactory(new PropertyValueFactory<>("forGrandma"));
+        table.getColumns().addAll(dateCol, amountCol, meCol, momCol, grandmaCol);
+        table.setItems(getFinanceRecords(username));
+        table.setPrefHeight(200);
 
         splitBtn.setOnAction(e -> {
             try {
@@ -38,6 +53,7 @@ public class FinanceTracker {
                 boolean saved = saveFinance(username, amount, me, mom, grandma);
                 if (saved) {
                     result.setText(String.format("Split: You: %.2f | Mom: %.2f | Grandma: %.2f (Saved)", me, mom, grandma));
+                    table.setItems(getFinanceRecords(username));
                 } else {
                     result.setText("Error saving to database.");
                 }
@@ -49,11 +65,57 @@ public class FinanceTracker {
         Button backBtn = new Button("Back to Dashboard");
         backBtn.setOnAction(e -> Dashboard.show(primaryStage, username));
 
-        root.getChildren().addAll(title, amountField, splitBtn, result, backBtn);
-        Scene scene = new Scene(root, 500, 350);
+        root.getChildren().addAll(title, amountField, splitBtn, result, table, backBtn);
+        Scene scene = new Scene(root, 700, 500);
         primaryStage.setScene(scene);
         primaryStage.setTitle("Finance Tracker");
         primaryStage.show();
+    }
+
+    public static class FinanceRecord {
+        private String date;
+        private double amount, forMe, forMom, forGrandma;
+        public FinanceRecord(String date, double amount, double forMe, double forMom, double forGrandma) {
+            this.date = date; this.amount = amount; this.forMe = forMe; this.forMom = forMom; this.forGrandma = forGrandma;
+        }
+        public String getDate() { return date; }
+        public double getAmount() { return amount; }
+        public double getForMe() { return forMe; }
+        public double getForMom() { return forMom; }
+        public double getForGrandma() { return forGrandma; }
+    }
+
+    private static ObservableList<FinanceRecord> getFinanceRecords(String username) {
+        ObservableList<FinanceRecord> records = FXCollections.observableArrayList();
+        try (FileInputStream fis = new FileInputStream("dbconfig.properties")) {
+            Properties props = new Properties();
+            props.load(fis);
+            String url = "jdbc:mysql://" + props.getProperty("host") + ":" + props.getProperty("port") + "/" + props.getProperty("database");
+            String dbUser = props.getProperty("username");
+            String dbPass = props.getProperty("password");
+            Connection conn = DriverManager.getConnection(url, dbUser, dbPass);
+            PreparedStatement getUser = conn.prepareStatement("SELECT id FROM users WHERE username = ?");
+            getUser.setString(1, username);
+            ResultSet rs = getUser.executeQuery();
+            if (rs.next()) {
+                int userId = rs.getInt(1);
+                PreparedStatement stmt = conn.prepareStatement("SELECT date_paid, amount, for_me, for_mom, for_grandma FROM finance WHERE user_id = ? ORDER BY date_paid DESC");
+                stmt.setInt(1, userId);
+                ResultSet frs = stmt.executeQuery();
+                while (frs.next()) {
+                    records.add(new FinanceRecord(
+                        frs.getString(1),
+                        frs.getDouble(2),
+                        frs.getDouble(3),
+                        frs.getDouble(4),
+                        frs.getDouble(5)
+                    ));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return records;
     }
 
     private static boolean saveFinance(String username, double amount, double me, double mom, double grandma) {

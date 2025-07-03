@@ -16,13 +16,8 @@ public class Main extends Application {
             DBConfigPrompt.show(primaryStage);
             return;
         }
-        // Placeholder for login/dashboard
-        Label label = new Label("Welcome to D-Accounts! (UI coming soon)");
-        StackPane root = new StackPane(label);
-        Scene scene = new Scene(root, 800, 600);
-        primaryStage.setTitle("D-Accounts Dashboard");
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        // Show login screen after DB config
+        LoginScreen.show(primaryStage);
     }
 
     public static void main(String[] args) {
